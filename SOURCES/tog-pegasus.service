@@ -6,7 +6,7 @@ After=syslog.target slpd.service
 Type=forking
 ExecStartPre=/usr/share/Pegasus/scripts/generate-certs
 ExecStart=/usr/sbin/cimserver
-PIDFile=/var/run/tog-pegasus/cimserver.pid
+PIDFile=/run/tog-pegasus/cimserver.pid
 
 [Install]
 WantedBy=multi-user.target

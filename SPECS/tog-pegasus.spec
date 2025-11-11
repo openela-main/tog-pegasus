@@ -8,7 +8,7 @@
 
 Name:           tog-pegasus
 Version:        %{major_ver}.1
-Release:        64%{?dist}
+Release:        65%{?dist}
 Epoch:          2
 Summary:        OpenPegasus WBEM Services for Linux
 
@@ -98,14 +98,17 @@ Patch41:        pegasus-2.14.1-ssl-cert-path.patch
 # 42: port to openssl-1.1
 Patch42:        pegasus-2.14.1-openssl-1.1-fix.patch
 # 43: fix -Wreserved-user-defined-literal warnings which prevents building with clang
-Patch43:	pegasus-2.14.1-fix-Wreserved-user-defined-literal.patch
+Patch43:        pegasus-2.14.1-fix-Wreserved-user-defined-literal.patch
 # 44: comply with Fedora crypto policy
 #  (use 'PROFILE=SYSTEM' instead of 'DEFAULT' in SSL_CTX_set_cipher_list calls)
-Patch44:	pegasus-2.14.1-crypto-policy-compliance.patch
+Patch44:        pegasus-2.14.1-crypto-policy-compliance.patch
 # 45: add required lib to fix FTBS
-Patch45:	pegasus-2.14.1-add-pegwsmserver-to-ldd-libs.patch
+Patch45:        pegasus-2.14.1-add-pegwsmserver-to-ldd-libs.patch
 # 46: Remove DES support.
-Patch46:	pegasus-snmp-disable-des.patch
+Patch46:        pegasus-snmp-disable-des.patch
+# 47: use sscg to generate cert, openssl as fallback, obtain correct key length
+#  based upon crypto policy level
+Patch47:        pegasus-2.14.1-ssl-certs-gen-changes.patch
 
 BuildRequires:  procps, libstdc++, pam-devel
 BuildRequires:  openssl, openssl-devel
@@ -230,36 +233,37 @@ The OpenPegasus WBEM tests for the OpenPegasus %{version} Linux rpm.
 # convert DMTF schema for Pegasus
 export PEGASUS_ROOT=%PEGASUS_RPM_ROOT
 yes | mak/CreateDmtfSchema 238 %{SOURCE9} cim_schema_2.38.0
-%patch1 -p1 -b .no-rpath
-%patch2 -p1 -b .PIE
-%patch3 -p1 -b .redhat-config
-%patch4 -p1 -b .cmpi-provider-lib
-%patch6 -p1 -b .pam-wbem
-%patch12 -p1 -b .snmp-tests
-%patch5 -p1 -b .local-or-remote-auth
-%patch13 -p1 -b .sparc
-%patch16 -p1 -b .getpagesize
-%patch19 -p1 -b .dont-strip
-%patch20 -p1 -b .sparc-locks
-%patch22 -p1 -b .null_value
-%patch24 -p1 -b .empty_arrays
-%patch25 -p1 -b .cimmofl-allow-experimental
-%patch26 -p1 -b .schema-version-and-includes
-%patch29 -p1 -b .enable-subscriptions-for-nonprivileged-users
-%patch33 -p1 -b .gcc5-build
-%patch34 -p1 -b .build-fixes
-%patch35 -p1 -b .ssl-include
-%patch36 -p1 -b .snmpv3-trap
-%patch37 -p1 -b .fix-setup-sdk
-%patch38 -p1 -b .cimconfig-man-page-fixes
-%patch39 -p1 -b .fix-setup-sdk-ppc64le
-%patch40 -p1 -b .testid
-%patch41 -p1 -b .ssl-cert-path
-%patch42 -p1 -b .openssl-1.1-fix
-%patch43 -p1 -b .Wreserved-user-defined-literal-fix
-%patch44 -p1 -b .crypto-policy-compliance
-%patch45 -p1 -b .add-pegwsmserver-to-ldd-libs
-%patch46 -p1 -b .snmp-disable-des
+%patch -P1 -p1 -b .no-rpath
+%patch -P2 -p1 -b .PIE
+%patch -P3 -p1 -b .redhat-config
+%patch -P4 -p1 -b .cmpi-provider-lib
+%patch -P6 -p1 -b .pam-wbem
+%patch -P12 -p1 -b .snmp-tests
+%patch -P5 -p1 -b .local-or-remote-auth
+%patch -P13 -p1 -b .sparc
+%patch -P16 -p1 -b .getpagesize
+%patch -P19 -p1 -b .dont-strip
+%patch -P20 -p1 -b .sparc-locks
+%patch -P22 -p1 -b .null_value
+%patch -P24 -p1 -b .empty_arrays
+%patch -P25 -p1 -b .cimmofl-allow-experimental
+%patch -P26 -p1 -b .schema-version-and-includes
+%patch -P29 -p1 -b .enable-subscriptions-for-nonprivileged-users
+%patch -P33 -p1 -b .gcc5-build
+%patch -P34 -p1 -b .build-fixes
+%patch -P35 -p1 -b .ssl-include
+%patch -P36 -p1 -b .snmpv3-trap
+%patch -P37 -p1 -b .fix-setup-sdk
+%patch -P38 -p1 -b .cimconfig-man-page-fixes
+%patch -P39 -p1 -b .fix-setup-sdk-ppc64le
+%patch -P40 -p1 -b .testid
+%patch -P41 -p1 -b .ssl-cert-path
+%patch -P42 -p1 -b .openssl-1.1-fix
+%patch -P43 -p1 -b .Wreserved-user-defined-literal-fix
+%patch -P44 -p1 -b .crypto-policy-compliance
+%patch -P45 -p1 -b .add-pegwsmserver-to-ldd-libs
+%patch -P46 -p1 -b .snmp-disable-des
+%patch -P47 -p1 -b .ssl-certs-gen-changes
 
 
 %build
@@ -561,6 +565,12 @@ fi
 
 
 %changelog
+* Fri Apr 11 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2:2.14.1-65
+- Update OpenSSL certificates set up
+  Resolves: RHEL-81721
+- Remove deprecated path from systemd service file
+  Resolves: RHEL-81716
+
 * Tue Feb 01 2022 Vitezslav Crhonek <vcrhonek@redhat.com> - 2.14.1-64
 - Fix build flags
   Resolves: #2044895
