@@ -23,11 +23,20 @@
    PEGASUS_SSL_KEY_FILE_PATH = $(PEGASUS_PEM_DIR)/$(PEGASUS_SSL_KEY_FILE)
                   (= /etc/pki/Pegasus/file.pem)
    o Contains the private key for the CIM Server SSL Certificate.
+                     /etc/pki/Pegasus/file-fallback.pem
+   o Contains private key for the fall back CIM Server SSL Certificate.
 
    PEGASUS_SSL_CERT_FILE = server.pem
    PEGASUS_SSL_CERT_FILE_PATH = $(PEGASUS_PEM_DIR)/$(PEGASUS_SSL_CERT_FILE)
                              (= /etc/pki/Pegasus/server.pem)
    o Contains the CIM Server SSL Certificate.
+                                /etc/pki/Pegasus/server-fallback.pem
+   o Contains the fall back CIM Server SSL Certificate.
+     Fall back certificate can be used for example when the CIM Server SSL Certificate
+     is ML-DSA (Post-Quantum Cryptography) and there's need to also support a classic
+     certificate chain for clients without Post-Quantum Cryptography capabilities.
+     To be taken into account both file-fallback.pem and server-fallback.pem need to
+     exist. They are ignored othervise.
 
    PEGASUS_SSL_TRUSTSTORE = client.pem
    PEGASUS_SSL_CLIENT_TRUSTSTORE = $(PEGASUS_PEM_DIR)/$(PEGASUS_SSL_TRUSTSTORE)
