@@ -3,12 +3,10 @@
 
 %global srcname pegasus
 %global major_ver 2.14
-%global pegasus_gid 65
-%global pegasus_uid 66
 
 Name:           tog-pegasus
 Version:        %{major_ver}.1
-Release:        65%{?dist}
+Release:        68%{?dist}
 Epoch:          2
 Summary:        OpenPegasus WBEM Services for Linux
 
@@ -38,6 +36,8 @@ Source10:       generate-certs
 Source11:       snmptrapd.conf
 # 12: repupgrade man page based on pegasus/src/Clients/repupgrade/doc/repupgrade.html
 Source12:       repupgrade.1.gz
+# 13: sysusers conf file for dynamic creation of the 'pegasus' user and group
+Source13:       tog-pegasus.sysusers
 
 #  1: http://cvs.rdg.opengroup.org/bugzilla/show_bug.cgi?id=5011
 #     Removing insecure -rpath
@@ -109,6 +109,8 @@ Patch46:        pegasus-snmp-disable-des.patch
 # 47: use sscg to generate cert, openssl as fallback, obtain correct key length
 #  based upon crypto policy level
 Patch47:        pegasus-2.14.1-ssl-certs-gen-changes.patch
+# 48: add mechanism to load fall back certificate/key pair
+Patch48:        pegasus-2.14.1-post-quantum.patch
 
 BuildRequires:  procps, libstdc++, pam-devel
 BuildRequires:  openssl, openssl-devel
@@ -116,7 +118,7 @@ BuildRequires:  bash, sed, grep, coreutils, procps, gcc, gcc-c++
 BuildRequires:  libstdc++, make, pam-devel
 BuildRequires:  openssl-devel
 BuildRequires:  net-snmp-devel, openslp-devel
-BuildRequires:  systemd-units
+BuildRequires:  systemd-units systemd-rpm-macros
 Requires:       net-snmp-libs
 Requires:       %{name}-libs = %{epoch}:%{version}-%{release}
 Requires:       openssl
@@ -134,8 +136,7 @@ sources.
 
 %package devel
 Summary:        The OpenPegasus Software Development Kit
-Requires:       tog-pegasus >= %{version}-%{release}
-Obsoletes:      tog-pegasus-sdk
+Requires:       tog-pegasus >= %{epoch}:%{version}-%{release}
 
 %description devel
 The OpenPegasus WBEM Services for Linux SDK is the developer's kit for the
@@ -156,7 +157,7 @@ The OpenPegasus libraries.
 %if %{PEGASUS_BUILD_TEST_RPM}
 %package test
 Summary:        The OpenPegasus Tests
-Requires:       tog-pegasus >= %{version}-%{release}, make
+Requires:       tog-pegasus >= %{epoch}:%{version}-%{release}, make
 Requires:       %{name}-libs = %{epoch}:%{version}-%{release}
 
 %description test
@@ -264,6 +265,7 @@ yes | mak/CreateDmtfSchema 238 %{SOURCE9} cim_schema_2.38.0
 %patch -P45 -p1 -b .add-pegwsmserver-to-ldd-libs
 %patch -P46 -p1 -b .snmp-disable-des
 %patch -P47 -p1 -b .ssl-certs-gen-changes
+%patch -P48 -p1 -b .post-quantum
 
 
 %build
@@ -370,6 +372,9 @@ install -p Schemas/CIM238/DMTF/Core/CIM_AbstractComponent.mof $RPM_BUILD_ROOT/us
 mkdir -p ${RPM_BUILD_ROOT}/%{_mandir}/man1/
 cp %SOURCE12 ${RPM_BUILD_ROOT}/%{_mandir}/man1/
 
+# install sysusers conf file (arch-specific name for multilib)
+install -p -D -m 0644 %{SOURCE13} %{buildroot}%{_sysusersdir}/tog-pegasus-%{_arch}.conf
+
 %check
 # run unit tests
 export LD_LIBRARY_PATH=$RPM_BUILD_ROOT/usr/%{_lib}
@@ -446,7 +451,9 @@ rm $RPM_BUILD_ROOT/usr/share/Pegasus/test/testtracer4.trace.0
 %{_libdir}/*
 %exclude /usr/lib/debug
 %exclude /usr/lib/systemd
+%exclude %dir %{_sysusersdir}
 %exclude %{_tmpfilesdir}
+%{_sysusersdir}/tog-pegasus-%{_arch}.conf
 
 %if %{PEGASUS_BUILD_TEST_RPM}
 %files test
@@ -493,6 +500,8 @@ if [ $1 -ge 1 ]; then
       fi;
       /bin/systemctl try-restart tog-pegasus.service >/dev/null 2>&1 || :;
    fi;
+   # copy content of /var/lib/Pegasus to temporary place for Image Mode
+   (mkdir -p /usr/share/factory/var/lib && cp -a /var/lib/Pegasus /usr/share/factory/var/lib/Pegasus) >/dev/null 2>&1 || :;
 fi
 :;
 
@@ -501,6 +510,7 @@ fi
 if [ $1 -eq 0 ]; then                  
    # Package removal, not upgrade     
    rm -rf /var/run/tog-pegasus
+   rm -rf /usr/share/factory/var/lib/Pegasus
 fi
 :;
 
@@ -517,9 +527,9 @@ fi
 %pre libs
 if [ $1 -eq 1 ]; then
 #  first install: create the 'pegasus' user and group:
-   /usr/sbin/groupadd -g %{pegasus_gid} -f -r pegasus >/dev/null 2>&1 || :; 
-   /usr/sbin/useradd -u %{pegasus_uid} -r -N -M -g pegasus -s /sbin/nologin -d /var/lib/Pegasus \
-     -c "tog-pegasus OpenPegasus WBEM/CIM services" pegasus >/dev/null 2>&1 || :;
+   {
+      %sysusers_create_compat %{SOURCE13}
+   } >/dev/null 2>&1 || :;
 fi
 :;
 
@@ -565,6 +575,21 @@ fi
 
 
 %changelog
+* Wed Feb 18 2026 Vitezslav Crhonek <vcrhonek@redhat.com> - 2:2.14.1-68
+- Fix multilib issue with systemd-sysusers config
+  Related: RHEL-90737
+
+* Tue Feb 03 2026 Vitezslav Crhonek <vcrhonek@redhat.com> - 2:2.14.1-67
+- Add support for post-quantum cryptography
+  Resolves: RHEL-127514
+
+* Fri Sep 26 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2:2.14.1-66
+- Use systemd-sysusers for the 'pegasus' user and group creation
+- Fix Requires of subpackages
+  Related: RHEL-90737
+- Add support for Image Mode
+  Resolves: RHEL-90737
+
 * Fri Apr 11 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2:2.14.1-65
 - Update OpenSSL certificates set up
   Resolves: RHEL-81721

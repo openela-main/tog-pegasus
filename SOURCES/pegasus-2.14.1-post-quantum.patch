@@ -1,0 +1,102 @@
+--- pegasus/src/Pegasus/Common/SSLContext.cpp.orig	2026-01-29 16:18:25.472992730 +0100
++++ pegasus/src/Pegasus/Common/SSLContext.cpp	2026-01-29 16:36:19.947100277 +0100
+@@ -788,6 +788,41 @@
+     }
+ 
+     //
++    // Configure TLS key exchange groups with PQC support
++    //
++    if (SSL_CTX_set1_groups_list(sslContext,
++            "X25519MLKEM768:P-256:P-384:X25519") != 1)
++    {
++        PEG_TRACE_CSTRING(TRC_SSL, Tracer::LEVEL4,
++            "---> SSL: Failed to set PQC groups, trying traditional groups");
++        // Fallback to traditional groups for systems without PQC support
++        if (SSL_CTX_set1_groups_list(sslContext, "P-256:P-384:X25519") != 1)
++        {
++            PEG_TRACE_CSTRING(TRC_SSL, Tracer::LEVEL1,
++                "---> SSL: Failed to set traditional groups");
++        }
++    }
++
++    //
++    // Configure TLS signature algorithms with PQC support (ML-DSA)
++    //
++    if (SSL_CTX_set1_sigalgs_list(sslContext,
++            "mldsa65:rsa_pss_rsae_sha256:rsa_pss_rsae_sha384:"
++            "rsa_pss_rsae_sha512:ecdsa_secp256r1_sha256:ecdsa_secp384r1_sha384") != 1)
++    {
++        PEG_TRACE_CSTRING(TRC_SSL, Tracer::LEVEL4,
++            "---> SSL: Failed to set PQC signature algorithms, trying traditional algorithms");
++        // Fallback to traditional signature algorithms
++        if (SSL_CTX_set1_sigalgs_list(sslContext,
++                "rsa_pss_rsae_sha256:rsa_pss_rsae_sha384:rsa_pss_rsae_sha512:"
++                "ecdsa_secp256r1_sha256:ecdsa_secp384r1_sha384") != 1)
++        {
++            PEG_TRACE_CSTRING(TRC_SSL, Tracer::LEVEL1,
++                "---> SSL: Failed to set traditional signature algorithms");
++        }
++    }
++
++    //
+     // set overall SSL Context flags
+     //
+     // For OpenSSLversion >1.0.0 use SSL_OP_NO_COMPRESSION to disable the 
+@@ -1095,6 +1130,57 @@
+         keyLoaded = true;
+     }
+ 
++    //
++    // Load fall back certificate/key pair if both exist
++    //
++    const String& certFallbackPath = "/etc/pki/Pegasus/server-fallback.pem";
++    const String& keyFallbackPath = "/etc/pki/Pegasus/file-fallback.pem";
++
++    FILE* certIs = Executor::openFile(certFallbackPath.getCString(), 'r');
++    FILE* keyIs = Executor::openFile(keyFallbackPath.getCString(), 'r');
++
++    if (certIs && keyIs)
++    {
++        fclose(certIs);
++        fclose(keyIs);
++
++        PEG_TRACE((TRC_SSL, Tracer::LEVEL4,
++            "---> SSL: Loading server certificate fall back from: %s",
++            (const char*)certFallbackPath.getCString()));
++
++        if (SSL_CTX_use_certificate_file(sslContext,
++            (const char*)certFallbackPath.getCString(), SSL_FILETYPE_PEM) != 1)
++        {
++            PEG_TRACE((TRC_SSL, Tracer::LEVEL1,
++                "---> SSL: No server certificate fall back found in %s",
++                (const char*)certFallbackPath.getCString()));
++            MessageLoaderParms parms(
++                "Common.SSLContext.COULD_NOT_ACCESS_SERVER_CERTIFICATE",
++                "Could not access server certificate fall back in $0.",
++                (const char*)certFallbackPath.getCString());
++
++            SSL_CTX_free(sslContext);
++            sslContext = NULL;
++            PEG_METHOD_EXIT();
++            throw SSLException(parms);
++        }
++
++        PEG_TRACE((TRC_SSL, Tracer::LEVEL4,
++            "---> SSL: loading private key fall back from: %s",
++            (const char*)keyFallbackPath.getCString()));
++
++        if (SSL_CTX_use_PrivateKey_file(sslContext,
++            (const char*)keyFallbackPath.getCString(), SSL_FILETYPE_PEM) != 1)
++        {
++            MessageLoaderParms parms(
++                "Common.SSLContext.COULD_NOT_GET_PRIVATE_KEY",
++                "Could not get private key fall back.");
++            SSL_CTX_free(sslContext);
++            sslContext = NULL;
++            PEG_METHOD_EXIT();
++            throw SSLException(parms);
++        }
++    }
+     PEG_METHOD_EXIT();
+     return sslContext;
+ }
