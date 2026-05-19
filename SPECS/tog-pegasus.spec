@@ -6,7 +6,7 @@
 
 Name:           tog-pegasus
 Version:        %{major_ver}.1
-Release:        78%{?dist}
+Release:        79%{?dist}
 Epoch:          2
 Summary:        OpenPegasus WBEM Services for Linux
 
@@ -509,6 +509,8 @@ if [ $1 -ge 1 ]; then
       fi;
       /bin/systemctl try-restart tog-pegasus.service >/dev/null 2>&1 || :;
    fi;
+   # copy content of /var/lib/Pegasus to temporary place for Image Mode
+   (mkdir -p /usr/share/factory/var/lib && cp -a /var/lib/Pegasus /usr/share/factory/var/lib/Pegasus) >/dev/null 2>&1 || :;
 fi
 :;
 
@@ -517,6 +519,7 @@ fi
 if [ $1 -eq 0 ]; then                  
    # Package removal, not upgrade     
    rm -rf /var/run/tog-pegasus
+   rm -rf /usr/share/factory/var/lib/Pegasus
 fi
 :;
 
@@ -581,6 +584,10 @@ fi
 
 
 %changelog
+* Fri Sep 26 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2:2.14.1-79
+- Add support for Image Mode
+  Resolves: RHEL-114453
+
 * Mon Jul 21 2025 Vitezslav Crhonek <vcrhonek@redhat.com> - 2:2.14.1-78
 - Support added for post-quantum cryptography
   Resolves: RHEL-93093
